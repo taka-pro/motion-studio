@@ -78,12 +78,18 @@ sh start.sh
 
 ## 自分のキャラクターを使う
 
-`assets/parts.json` がリグの定義です。これと同名のPNGを差し替えれば、別のキャラクターで
-動かせます。
+> **先に注意：PNGと `parts.json` を差し替えるだけでは合いません。**
+> `renderer.js` にこのキャラクター固有の座標が直接埋め込まれているため、
+> 体格や解像度の違う絵を入れると、頭が浮いたり、胸元とは無関係な場所が波打ったりします。
+> 差し替えるには後述の定数も併せて書き換えてください。
+> 仕組みを追える人向けの構成です（リポジトリごとAIコーディングエージェントに渡して
+> 書き換えさせるのが手軽です）。
+
+`assets/parts.json` がパーツの配置表です。
 
 ```jsonc
 {
-  "canvas": [1792, 2240],          // 元イラストの解像度
+  "canvas": [1792, 2240],          // 元イラストの解像度（※現在renderer.jsは参照していない）
   "parts": [
     {
       "name": "01_Body_Base",      // assets/<name>.png と対応
@@ -98,22 +104,45 @@ sh start.sh
 ```
 
 - **配列の順番が描画順**です。先頭が最背面になります。
-- `parent` が `BODY` のパーツは体の傾きに、`HEAD` のパーツは体の傾き＋頭の打ち消し＋
-  髪の遅れに追従します。
-- まばたきは `10_Eye_*_Open` / `_Half` / `_Closed` という名前で3状態を切り替えています。
-  この命名を踏襲してください。
-- 胸元の変形は `01_Body_Base` の一部範囲にディスプレイスメントマップをかけています。
-  画像をずらすのではなく変形させているので、服との境目が目立ちません。
+- `parent` が `BODY` のパーツは体の傾きに、`HEAD` のパーツは体の傾き＋頭の打ち消しに
+  追従します。
+- `pivot` が効くのは髪3枚と腕2枚だけです。他のパーツは回転角が0なので参照されません。
+- `box` は全パーツで使われます。ここだけは完全にデータ駆動です。
 
-After Effects のレイヤー書き出しから `parts.json` を作り直す場合は
-`tools/prepare_assets.py` を使ってください（Pillow が必要です）。
+### 併せて書き換える定数
+
+`renderer.js` の以下がこのキャラクター専用の値です。
+
+| 場所 | 値 | 意味 |
+|---|---|---|
+| `render()` | `2240` / `-896` | 元画像の高さと中心X。スケールと中央寄せの基準 |
+| `render()` | `[896, 2040]` | 体の回転支点（腰のあたり） |
+| `render()` | `[898, 746]` | 頭の回転支点（首のあたり） |
+| フラグメントシェーダー | 中心 `(896, 1340)` / 半径 `(405, 425)` | 胸元を変形させる楕円の範囲 |
+
+レイヤー名も直書きです。以下の名前と一致しないと、その部位は**エラーも出さず静止します**。
+
+```
+01_Body_Base          胸元の変形をかける対象
+02_Arm_ScreenLeft     腕の揺れ
+03_Arm_ScreenRight
+11_Hair_Front         前髪の揺れ
+12_Hair_ScreenLeft    髪の揺れ（遅れ付き）
+13_Hair_ScreenRight
+*_Eye_*_Open / _Half / _Closed    まばたきの3状態
+```
+
+胸元の変形は `01_Body_Base` の楕円範囲にディスプレイスメントマップをかけています。
+画像をずらすのではなく変形させているので、服との境目が目立ちません。
+
+### After Effects の書き出しから作り直す
 
 ```sh
 python tools/prepare_assets.py --src path/to/export --out assets
 ```
 
-同梱のキャラクターは 1792×2240、17パーツ（胴体・左右の腕・首・顔・口・左右の眉・
-左右の目3状態・前髪・左右の髪）です。
+Pillow が必要です。同梱のキャラクターは 1792×2240、17パーツ（胴体・左右の腕・首・顔・口・
+左右の眉・左右の目3状態・前髪・左右の髪）です。
 
 ## しくみ
 
@@ -182,10 +211,15 @@ The exporter renders frame by frame through the same code path as the preview, s
 output speed does not depend on machine performance. For a seamless loop, set the
 duration to a whole multiple of the sway period (blinks cycle every 4 s).
 
-**Using your own character:** `assets/parts.json` defines the rig — array order is
-draw order, `parent` is `BODY` or `HEAD`, `pivot` is the rotation centre in canvas
-pixels, and eyes switch between `_Open` / `_Half` / `_Closed` textures. Rebuild it
-from an After Effects layer export with `tools/prepare_assets.py` (needs Pillow).
+**Using your own character:** swapping the PNGs and `assets/parts.json` is **not**
+enough. `renderer.js` bakes in this character's geometry — the canvas height
+(`2240`) and centre (`896`), the body pivot (`[896, 2040]`), the head pivot
+(`[898, 746]`) and the chest displacement ellipse (centre `(896, 1340)`, radii
+`(405, 425)`) — and it matches layer names literally (`01_Body_Base`,
+`02_Arm_ScreenLeft`, `12_Hair_ScreenLeft`, `*_Eye_*_Open|Half|Closed`, …). A part
+whose name does not match simply stays still, with no error. Change those
+constants alongside the assets. This is built to be read and edited, not
+configured — handing the repo to a coding agent works well for the swap.
 
 **How the export works:** the browser POSTs one JPEG per frame to a loopback-only
 Python server, which pipes them into FFmpeg's stdin. The server binds to
