@@ -78,18 +78,12 @@ sh start.sh
 
 ## 自分のキャラクターを使う
 
-> **先に注意：PNGと `parts.json` を差し替えるだけでは合いません。**
-> `renderer.js` にこのキャラクター固有の座標が直接埋め込まれているため、
-> 体格や解像度の違う絵を入れると、頭が浮いたり、胸元とは無関係な場所が波打ったりします。
-> 差し替えるには後述の定数も併せて書き換えてください。
-> 仕組みを追える人向けの構成です（リポジトリごとAIコーディングエージェントに渡して
-> 書き換えさせるのが手軽です）。
-
-`assets/parts.json` がパーツの配置表です。
+キャラクターの定義は `assets/parts.json` と `renderer.js` の2か所に分かれています。
+配置は `parts.json`、動きの支点と変形範囲は `renderer.js` に直接書かれています。
 
 ```jsonc
 {
-  "canvas": [1792, 2240],          // 元イラストの解像度（※現在renderer.jsは参照していない）
+  "canvas": [1792, 2240],          // 元イラストの解像度（renderer.jsは参照していない）
   "parts": [
     {
       "name": "01_Body_Base",      // assets/<name>.png と対応
@@ -107,11 +101,9 @@ sh start.sh
 - `parent` が `BODY` のパーツは体の傾きに、`HEAD` のパーツは体の傾き＋頭の打ち消しに
   追従します。
 - `pivot` が効くのは髪3枚と腕2枚だけです。他のパーツは回転角が0なので参照されません。
-- `box` は全パーツで使われます。ここだけは完全にデータ駆動です。
+- `box` は全パーツで使われます。
 
-### 併せて書き換える定数
-
-`renderer.js` の以下がこのキャラクター専用の値です。
+### renderer.js に直接書かれている値
 
 | 場所 | 値 | 意味 |
 |---|---|---|
@@ -120,7 +112,7 @@ sh start.sh
 | `render()` | `[898, 746]` | 頭の回転支点（首のあたり） |
 | フラグメントシェーダー | 中心 `(896, 1340)` / 半径 `(405, 425)` | 胸元を変形させる楕円の範囲 |
 
-レイヤー名も直書きです。以下の名前と一致しないと、その部位は**エラーも出さず静止します**。
+動かすレイヤーは名前で判定しています。名前が一致しないパーツは静止したまま描画されます。
 
 ```
 01_Body_Base          胸元の変形をかける対象
@@ -211,15 +203,15 @@ The exporter renders frame by frame through the same code path as the preview, s
 output speed does not depend on machine performance. For a seamless loop, set the
 duration to a whole multiple of the sway period (blinks cycle every 4 s).
 
-**Using your own character:** swapping the PNGs and `assets/parts.json` is **not**
-enough. `renderer.js` bakes in this character's geometry — the canvas height
-(`2240`) and centre (`896`), the body pivot (`[896, 2040]`), the head pivot
-(`[898, 746]`) and the chest displacement ellipse (centre `(896, 1340)`, radii
-`(405, 425)`) — and it matches layer names literally (`01_Body_Base`,
-`02_Arm_ScreenLeft`, `12_Hair_ScreenLeft`, `*_Eye_*_Open|Half|Closed`, …). A part
-whose name does not match simply stays still, with no error. Change those
-constants alongside the assets. This is built to be read and edited, not
-configured — handing the repo to a coding agent works well for the swap.
+**Using your own character:** the rig lives in two places. `assets/parts.json`
+holds the layout (draw order, `parent`, `pivot`, `box`), and `renderer.js` holds
+this character's geometry — canvas height `2240` and centre `896`, body pivot
+`[896, 2040]`, head pivot `[898, 746]`, and the chest displacement ellipse
+(centre `(896, 1340)`, radii `(405, 425)`). Animated layers are matched by name
+(`01_Body_Base`, `02_Arm_ScreenLeft`, `12_Hair_ScreenLeft`,
+`*_Eye_*_Open|Half|Closed`, …); a part whose name does not match is drawn
+without motion. `parts.json` declares a `canvas` field that the renderer does
+not read.
 
 **How the export works:** the browser POSTs one JPEG per frame to a loopback-only
 Python server, which pipes them into FFmpeg's stdin. The server binds to
