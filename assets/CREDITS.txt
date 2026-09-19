@@ -1,0 +1,9 @@
+キャラクターのパーツ画像（*.png）
+  Higgsfield GPT Image 2.5 で生成。1枚のベース画像をレイヤーごとに分解し、
+  隠れていた部分を補完したものです。
+
+背景画像（rooftop.jpg / beach.jpg / park.jpg）
+  ChatGPT（GPT-6 Astra）で生成し、JPEGへ再エンコードしています。
+
+いずれも本リポジトリのMITライセンスで配布しています。
+詳細は ../THIRD_PARTY_NOTICES.md を参照してください。

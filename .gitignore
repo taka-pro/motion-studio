@@ -1,0 +1,20 @@
+# 書き出した動画とログ（exports/.gitkeep だけ残す）
+exports/*
+!exports/.gitkeep
+
+# サーバーログ
+server.log
+server-error.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / エディター
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

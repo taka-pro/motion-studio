@@ -1,0 +1,10 @@
+* text=auto eol=lf
+
+# Windows 用バッチだけ CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# バイナリ
+*.png binary
+*.jpg binary
+*.mp4 binary
